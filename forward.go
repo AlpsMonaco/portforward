@@ -1,13 +1,17 @@
 package portforward
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
+	"sync/atomic"
 	"time"
 )
 
 var handleError func(err error)
+var errZeroRead = errors.New("read size is zero")
+var maxZeroRead int32 = 10
 
 func init() {
 	handleError = func(err error) {
@@ -29,9 +33,9 @@ func closeConn(conn ...net.Conn) {
 
 func handleStream(srcConn, dstConn net.Conn) error {
 	var err error
-	_, err = io.Copy(srcConn, dstConn)
-	if err == io.EOF {
-		err = nil
+	n, err := io.Copy(srcConn, dstConn)
+	if n == 0 {
+		return errZeroRead
 	}
 
 	return err
@@ -104,14 +108,28 @@ func (xf *Forward) handleConn(srcConn net.Conn) {
 
 	defer closeConn(dstConn)
 	var isConnErr bool
+	var zeroReadCount int32
+
+	addZeroRead := func() int32 {
+		return atomic.AddInt32(&zeroReadCount, 1)
+	}
 
 	go func() {
 		for {
 			err := handleStream(srcConn, dstConn)
 			if err != nil {
 				handleError(err)
-				isConnErr = true
-				break
+				if err == errZeroRead {
+					if addZeroRead() > maxZeroRead {
+						isConnErr = true
+						break
+					}
+
+				} else {
+					handleError(err)
+					isConnErr = true
+					break
+				}
 			}
 		}
 	}()
@@ -121,8 +139,17 @@ func (xf *Forward) handleConn(srcConn net.Conn) {
 			err := handleStream(dstConn, srcConn)
 			if err != nil {
 				handleError(err)
-				isConnErr = true
-				break
+				if err == errZeroRead {
+					if addZeroRead() > maxZeroRead {
+						isConnErr = true
+						break
+					}
+
+				} else {
+					handleError(err)
+					isConnErr = true
+					break
+				}
 			}
 		}
 	}()
