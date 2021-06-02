@@ -124,9 +124,7 @@ func (xf *Forward) handleConn(srcConn net.Conn) {
 						isConnErr = true
 						break
 					}
-
 				} else {
-					handleError(err)
 					isConnErr = true
 					break
 				}
@@ -144,9 +142,7 @@ func (xf *Forward) handleConn(srcConn net.Conn) {
 						isConnErr = true
 						break
 					}
-
 				} else {
-					handleError(err)
 					isConnErr = true
 					break
 				}
