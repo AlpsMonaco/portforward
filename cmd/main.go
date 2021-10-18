@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,7 +10,16 @@ import (
 )
 
 func main() {
-	f, err := portforward.NewForward("tcp", ":65432", "192.168.1.202:33123")
+	if len(os.Args) < 3 {
+		fmt.Println("error param")
+		PrintHelp()
+		os.Exit(1)
+	}
+
+	src := os.Args[1]
+	dst := os.Args[2]
+
+	f, err := portforward.NewForward("tcp", src, dst)
 	if err != nil {
 		panic(err)
 	}
@@ -18,4 +28,12 @@ func main() {
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	<-ch
 	f.Close()
+}
+
+func PrintHelp() {
+	fmt.Println(`
+	usage: portforward [src] [dst]
+	src could be ":80","127.0.0.1:80","0.0.0.0:80"
+	dst could be "target.com:12345" "172.31.0.4:889"
+	`)
 }
